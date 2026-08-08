@@ -1,6 +1,6 @@
 # cs2-nuke-viewer
 
-!! (this project is vibe coded sorry if it doesn't run that well) !!
+!! (this project is vibe coded and so are the explainers, as of 8/8 i have not read every word or line so sorry if it doesn't run that well) !!
 
 A viewer for the instrumentation, piping and electronics of `de_nuke` in CS2.
 

@@ -283,13 +283,34 @@ impl App {
     /// surface stayed configured at its startup size while the element grew —
     /// a small picture in the corner of a large black canvas. So winit is the
     /// only authority, and this just asks it.
-    fn surface_size(&self) -> (u32, u32) {
-        // The canvas's own drawing-buffer size, which winit maintains. On
-        // WebGPU the surface texture is exactly this, whatever the surface was
-        // configured with — so comparing against `window.inner_size()` instead
-        // leaves the depth attachment mismatched for the first frames and every
-        // one of them fails validation.
-        (self.canvas.width().max(1), self.canvas.height().max(1))
+    /// Size the canvas's drawing buffer to its CSS box, and report that size.
+    ///
+    /// Winit's web backend does **not** do this for a canvas handed to it with
+    /// `with_canvas`. Left alone the drawing buffer stays at 1x1 while the
+    /// element is laid out full-window, so the entire scene renders into a
+    /// single pixel and the browser stretches it over the page: one flat colour,
+    /// no panel, nothing to see. It looks like a dead renderer and is really a
+    /// one-pixel one.
+    ///
+    /// So this owns the size — sets it and reports it — and the surface is
+    /// configured from the same number. One authority, and the caller's
+    /// "has it changed?" test can never oscillate between two of them.
+    fn sync_canvas_size(&self) -> (u32, u32) {
+        let ratio = web_sys::window().map_or(1.0, |w| w.device_pixel_ratio());
+        let rect = self.canvas.get_bounding_client_rect();
+        // Round rather than truncate: at 125% and 150% scaling the CSS box is
+        // fractional, and rounding keeps the result stable frame to frame.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let width = ((rect.width() * ratio).round() as u32).max(1);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let height = ((rect.height() * ratio).round() as u32).max(1);
+        if self.canvas.width() != width {
+            self.canvas.set_width(width);
+        }
+        if self.canvas.height() != height {
+            self.canvas.set_height(height);
+        }
+        (width, height)
     }
 
     fn frame_visible(&mut self) {
@@ -341,15 +362,27 @@ impl ApplicationHandler for App {
         };
         let window = std::sync::Arc::new(window);
         self.window = Some(window.clone());
-        self.viewport = self.surface_size();
+        self.viewport = self.sync_canvas_size();
 
         // Device creation is async and the event loop cannot wait for it, so it
         // lands in the shared slot and the first few frames simply draw nothing.
         let slot = self.renderer.clone();
         let scene = self.scene.clone();
+        let (width, height) = self.viewport;
         wasm_bindgen_futures::spawn_local(async move {
             match Renderer::windowed(window, &scene).await {
-                Ok(renderer) => {
+                Ok(mut renderer) => {
+                    // Configuring a WebGPU surface *writes* the canvas drawing
+                    // buffer size. `Renderer::windowed` configures it from
+                    // winit's `inner_size()`, which on web is 1x1 until winit is
+                    // told otherwise — so creating the renderer undoes the
+                    // sizing the page just did, and everything afterwards
+                    // renders into a single pixel stretched across the window.
+                    // One flat colour, no panel. Put the real size back before
+                    // the first frame rather than waiting for the render loop
+                    // to notice, which never happens in a tab that is not
+                    // compositing.
+                    renderer.resize(width, height);
                     *slot.borrow_mut() = Some(renderer);
                     hide_overlay();
                 }
@@ -474,7 +507,7 @@ impl App {
         let dt = (now - self.last_frame).as_secs_f32().min(0.1);
         self.last_frame = now;
 
-        let (width, height) = self.surface_size();
+        let (width, height) = self.sync_canvas_size();
         self.viewport = (width, height);
 
         let mut slot = self.renderer.borrow_mut();

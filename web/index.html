@@ -146,6 +146,26 @@
   const loading = document.getElementById('loading');
   const unsupported = document.getElementById('unsupported');
   const status = document.getElementById('status');
+  const canvas = document.getElementById('canvas');
+
+  // Size the drawing buffer to the element's CSS box.
+  //
+  // Winit does not do this for a canvas passed to it with `with_canvas`: the
+  // buffer stays at its default and the whole scene renders into a couple of
+  // pixels, which the browser then stretches over the page as one flat colour.
+  // Doing it here rather than in the render loop means it is correct from the
+  // first frame, and stays correct in a background tab where rAF is throttled
+  // and the loop is not running at all.
+  function sizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width * devicePixelRatio));
+    const height = Math.max(1, Math.round(rect.height * devicePixelRatio));
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+  }
+  sizeCanvas();
+  new ResizeObserver(sizeCanvas).observe(canvas);
+  addEventListener('resize', sizeCanvas);
 
   // Check before loading 9 MB of scene and several MB of wasm, so an
   // unsupported browser gets an explanation immediately rather than after a

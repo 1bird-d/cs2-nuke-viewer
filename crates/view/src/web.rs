@@ -230,6 +230,8 @@ struct App {
     identifier: identify::Identifier,
     hovered: Option<usize>,
     show_labels: bool,
+    /// Whether the key legend is painted in the corner of the viewport.
+    show_keys: bool,
     /// The last prop the cursor named, so its links stay reachable.
     sticky: Option<&'static identify::Entry>,
     cursor: (f32, f32),
@@ -264,6 +266,7 @@ impl App {
             identifier: identify::Identifier::new().expect("identification table compiles"),
             hovered: None,
             show_labels: true,
+            show_keys: true,
             sticky: None,
             cursor: (0.0, 0.0),
             viewport: (1280, 720),
@@ -398,11 +401,20 @@ impl ApplicationHandler for App {
             (Some(panel), Some(window)) => panel.on_window_event(window, &event),
             _ => false,
         };
-        if consumed && !matches!(event, WindowEvent::RedrawRequested | WindowEvent::Resized(_)) {
+        if consumed
+            && !crate::is_release(&event)
+            && !matches!(
+                event,
+                WindowEvent::RedrawRequested | WindowEvent::Resized(_) | WindowEvent::Focused(_)
+            )
+        {
             return;
         }
 
         match event {
+            // Switching tab or clicking away sends the key-up somewhere else,
+            // and the camera would still be travelling on return.
+            WindowEvent::Focused(false) => self.input = Input::default(),
             WindowEvent::Resized(size) => {
                 self.viewport = (size.width.max(1), size.height.max(1));
                 if let Some(renderer) = self.renderer.borrow_mut().as_mut() {
@@ -468,6 +480,9 @@ impl ApplicationHandler for App {
                             }
                             if effect.toggle_labels {
                                 self.show_labels = !self.show_labels;
+                            }
+                            if effect.toggle_keys {
+                                self.show_keys = !self.show_keys;
                             }
                         }
                     }
@@ -570,6 +585,7 @@ impl App {
 
         let classification = &mut self.classification;
         let ghost = &mut self.ghost;
+        let show_keys = self.show_keys;
         let fps = self.fps;
         let mut response = panel::Response::default();
         let outcome = renderer.render(
@@ -588,6 +604,7 @@ impl App {
                     ghost,
                     selection,
                     &labels,
+                    show_keys,
                     stats,
                     fps,
                 );
@@ -639,6 +656,7 @@ fn view_key(code: KeyCode) -> Option<ViewKey> {
         KeyCode::BracketLeft => ViewKey::Dimmer,
         KeyCode::BracketRight => ViewKey::Brighter,
         KeyCode::KeyL => ViewKey::ToggleLabels,
+        KeyCode::KeyK => ViewKey::ToggleKeys,
         _ => return None,
     })
 }

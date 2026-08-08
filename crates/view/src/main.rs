@@ -310,6 +310,8 @@ struct App {
     sticky: Option<&'static identify::Entry>,
     /// Whether pinned names are drawn over each identified asset.
     show_labels: bool,
+    /// Whether the key legend is painted in the corner of the viewport.
+    show_keys: bool,
     /// Screen position of the last mouse move, in physical pixels.
     cursor: (f32, f32),
     /// Surface size in physical pixels, for turning the cursor into a ray.
@@ -345,6 +347,7 @@ impl App {
             identifier: identify::Identifier::new().expect("identification table compiles"),
             hovered: None,
             show_labels: true,
+            show_keys: true,
             sticky: None,
             cursor: (0.0, 0.0),
             viewport: (1600, 900),
@@ -475,6 +478,9 @@ impl App {
                     if self.show_labels { "shown" } else { "hidden" }
                 );
             }
+            if effect.toggle_keys {
+                self.show_keys = !self.show_keys;
+            }
             if let Some(what) = effect.announce {
                 if effect.dirty {
                     self.announce(&what);
@@ -523,6 +529,7 @@ fn view_key(code: KeyCode) -> Option<ViewKey> {
         KeyCode::BracketLeft => ViewKey::Dimmer,
         KeyCode::BracketRight => ViewKey::Brighter,
         KeyCode::KeyL => ViewKey::ToggleLabels,
+        KeyCode::KeyK => ViewKey::ToggleKeys,
         _ => return None,
     })
 }
@@ -562,9 +569,13 @@ impl ApplicationHandler for App {
             _ => false,
         };
         if consumed
+            && !plant::is_release(&event)
             && !matches!(
                 event,
-                WindowEvent::CloseRequested | WindowEvent::Resized(_) | WindowEvent::RedrawRequested
+                WindowEvent::CloseRequested
+                    | WindowEvent::Resized(_)
+                    | WindowEvent::RedrawRequested
+                    | WindowEvent::Focused(_)
             )
         {
             return;
@@ -572,6 +583,15 @@ impl ApplicationHandler for App {
 
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
+            // Losing focus means the release events are going somewhere else.
+            // Alt-tab away mid-flight and the key-up never arrives, so without
+            // this the camera is still travelling when you come back.
+            WindowEvent::Focused(false) => {
+                self.input = Input::default();
+                if let Some(window) = &self.window {
+                    window.set_cursor_visible(true);
+                }
+            }
             WindowEvent::Resized(size) => {
                 self.viewport = (size.width, size.height);
                 if let Some(renderer) = &mut self.renderer {
@@ -659,6 +679,7 @@ impl ApplicationHandler for App {
                     hovered,
                     sticky,
                     show_labels,
+                    show_keys,
                     cursor,
                     window,
                     renderer,
@@ -737,6 +758,7 @@ impl ApplicationHandler for App {
                             ghost,
                             selection,
                             &labels,
+                            *show_keys,
                             stats,
                             shown,
                         );

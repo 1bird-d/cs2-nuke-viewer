@@ -72,6 +72,24 @@ impl Input {
     }
 }
 
+/// Whether an event is a key or mouse-button *release*.
+///
+/// Releases must reach the camera even when the panel says it consumed the
+/// event. egui claims keyboard and pointer input whenever it has focus, and if
+/// it swallows the release of a key that is currently held, nothing ever clears
+/// that key: the camera flies in one direction forever, as though the key were
+/// still down. A press can safely be eaten by the UI. A release cannot, because
+/// it is the only thing that ends a state.
+#[must_use]
+pub fn is_release(event: &winit::event::WindowEvent) -> bool {
+    use winit::event::{ElementState, WindowEvent};
+    match event {
+        WindowEvent::KeyboardInput { event, .. } => event.state == ElementState::Released,
+        WindowEvent::MouseInput { state, .. } => *state == ElementState::Released,
+        _ => false,
+    }
+}
+
 /// What a view key did, so the caller can report it and rebuild if needed.
 pub struct KeyEffect {
     /// Human-readable description of the change, for the console or the title.
@@ -80,6 +98,8 @@ pub struct KeyEffect {
     pub dirty: bool,
     /// `L` was pressed.
     pub toggle_labels: bool,
+    /// `K` was pressed.
+    pub toggle_keys: bool,
 }
 
 /// Apply the keys that mean the same thing on both platforms: the category
@@ -99,6 +119,7 @@ pub fn apply_view_key(
         announce: None,
         dirty: false,
         toggle_labels: false,
+        toggle_keys: false,
     };
     match key {
         ViewKey::Category(index) => {
@@ -147,6 +168,7 @@ pub fn apply_view_key(
             effect.announce = Some(format!("ghost brightness {:.2}", ghost.gain));
         }
         ViewKey::ToggleLabels => effect.toggle_labels = true,
+        ViewKey::ToggleKeys => effect.toggle_keys = true,
     }
     effect
 }
@@ -164,6 +186,8 @@ pub enum ViewKey {
     Dimmer,
     Brighter,
     ToggleLabels,
+    /// Show or hide the key legend in the corner of the viewport.
+    ToggleKeys,
 }
 
 /// Collect the names to draw over the scene this frame.
@@ -286,3 +310,31 @@ pub mod export;
 pub mod web;
 #[cfg(target_arch = "wasm32")]
 pub mod webinput;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use winit::event::{DeviceId, ElementState, MouseButton, WindowEvent};
+
+    /// The stuck-key bug: hold a movement key, let the panel take focus, and
+    /// the key-up is consumed before the camera sees it — so the camera keeps
+    /// flying with nothing holding the key down. Releases must be exempt from
+    /// the consumed-by-egui early return.
+    #[test]
+    fn releases_are_recognised_so_they_can_never_be_swallowed() {
+        let press = WindowEvent::MouseInput {
+            device_id: DeviceId::dummy(),
+            state: ElementState::Pressed,
+            button: MouseButton::Right,
+        };
+        let release = WindowEvent::MouseInput {
+            device_id: DeviceId::dummy(),
+            state: ElementState::Released,
+            button: MouseButton::Right,
+        };
+        assert!(!is_release(&press));
+        assert!(is_release(&release));
+        // Anything that is not a press or release is neither.
+        assert!(!is_release(&WindowEvent::RedrawRequested));
+    }
+}

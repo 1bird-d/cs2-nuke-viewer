@@ -99,7 +99,8 @@ cargo run --release -p view --bin nukeplant
 | `[` `]` | ghost brightness |
 | `L` | toggle the pinned equipment names |
 | `F` | frame whatever is visible |
-| `H` | hide the panel (names stay up) |
+| `K` | hide the key legend in the corner |
+| `H` | hide the panel and the legend (names stay up) |
 | `F12` | screenshot to `captures/` (desktop only) |
 | `Esc` | quit |
 

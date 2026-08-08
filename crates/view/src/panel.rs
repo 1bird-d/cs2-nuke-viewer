@@ -185,6 +185,7 @@ impl Panel {
         ghost: &mut GhostParams,
         selection: Selection<'_>,
         labels: &Labels<'_>,
+        show_keys: bool,
         stats: DrawStats,
         fps: f32,
     ) -> Response {
@@ -204,6 +205,11 @@ impl Panel {
             // Labels first, so the panel window draws over them rather than
             // being obscured by a label that happens to land underneath it.
             draw_labels(ctx, labels);
+            // Chrome, like the panel: `H` takes both away for a clean frame,
+            // and `K` drops just this.
+            if show_keys && show_panel {
+                draw_keys(ctx);
+            }
             if show_panel {
                 build(
                     ctx,
@@ -415,6 +421,108 @@ fn draw_labels(ctx: &egui::Context, labels: &Labels<'_>) {
     }
 }
 
+/// Every control, in the corner of the viewport.
+///
+/// The loading page lists these too, but it is gone by the time anyone has
+/// anything to fly around, and a one-line summary at the foot of the panel is
+/// not a reference. So they live over the scene, where they are readable
+/// whether or not the panel is open.
+///
+/// Painted rather than built as an egui window on purpose: a window would take
+/// pointer input and steal clicks meant for the geometry underneath it.
+fn draw_keys(ctx: &egui::Context) {
+    /// `F12` and `Esc` only exist on the desktop — there is nowhere to write a
+    /// PNG in a browser, and a tab does not quit.
+    const DESKTOP_ONLY: bool = !cfg!(target_arch = "wasm32");
+
+    let mut rows: Vec<(&str, &str)> = vec![
+        ("W A S D", "fly"),
+        ("Q E", "down and up"),
+        ("right drag", "look around"),
+        ("shift / ctrl", "sprint / creep"),
+        ("wheel", "base speed"),
+        ("hover", "name what is under the cursor"),
+        ("click", "keep it in the panel, with photos"),
+        ("1 – 0", "cycle a category: solid, ghost, hidden"),
+        ("P I M", "plant / pipes only / everything"),
+        ("G X", "ghost the hidden / hide the ghosted"),
+        ("[ ]", "ghost brightness"),
+        ("L", "equipment names"),
+        ("F", "reframe on what is visible"),
+        ("K", "these keys"),
+        ("H", "hide the panel"),
+    ];
+    if DESKTOP_ONLY {
+        rows.push(("F12", "screenshot"));
+        rows.push(("Esc", "quit"));
+    }
+
+    let screen = ctx.viewport_rect();
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        egui::Order::Background,
+        egui::Id::new("nukeplant_keys"),
+    ));
+
+    let key_font = egui::FontId::monospace(10.5);
+    let text_font = egui::FontId::proportional(10.5);
+    let key_colour = egui::Color32::from_rgb(226, 232, 242);
+    let text_colour = egui::Color32::from_rgb(146, 156, 174);
+
+    // Lay everything out first so the key column can be as wide as its widest
+    // entry and no wider, and the card can be sized to fit.
+    let laid: Vec<(std::sync::Arc<egui::Galley>, std::sync::Arc<egui::Galley>)> = rows
+        .iter()
+        .map(|(key, what)| {
+            (
+                painter.layout_no_wrap((*key).to_string(), key_font.clone(), key_colour),
+                painter.layout_no_wrap((*what).to_string(), text_font.clone(), text_colour),
+            )
+        })
+        .collect();
+
+    let key_width = laid.iter().map(|(k, _)| k.size().x).fold(0.0, f32::max);
+    let text_width = laid.iter().map(|(_, t)| t.size().x).fold(0.0, f32::max);
+    let line = laid
+        .iter()
+        .map(|(k, t)| k.size().y.max(t.size().y))
+        .fold(0.0, f32::max)
+        + 2.0;
+
+    let pad = 9.0;
+    let gap = 10.0;
+    #[allow(clippy::cast_precision_loss)]
+    let height = line * laid.len() as f32 + pad * 2.0;
+    let width = key_width + gap + text_width + pad * 2.0;
+
+    // Bottom right. The panel opens top left and is tall enough to reach the
+    // bottom of the window, so the left side is not free — putting the legend
+    // there overlaps it and both become unreadable.
+    let origin = egui::pos2(
+        (screen.right() - width - 14.0).max(screen.left() + 4.0),
+        (screen.bottom() - height - 14.0).max(screen.top() + 4.0),
+    );
+    let rect = egui::Rect::from_min_size(origin, egui::vec2(width, height));
+
+    painter.rect_filled(rect, 3.0, egui::Color32::from_rgba_unmultiplied(10, 12, 16, 198));
+    painter.rect_stroke(
+        rect,
+        3.0,
+        egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 51, 64)),
+        egui::StrokeKind::Inside,
+    );
+
+    let mut y = origin.y + pad;
+    for (key, what) in laid {
+        painter.galley(egui::pos2(origin.x + pad, y), key, key_colour);
+        painter.galley(
+            egui::pos2(origin.x + pad + key_width + gap, y),
+            what,
+            text_colour,
+        );
+        y += line;
+    }
+}
+
 /// A dark panel that sits over a dark viewport without competing with it.
 ///
 /// The viewport behind is near-black, so egui's default dark theme lands at
@@ -561,12 +669,12 @@ fn build(
 
             ui.add_space(8.0);
             ui.separator();
+            // The full list is painted in the corner of the viewport; this only
+            // has to say where it is.
             ui.label(
-                egui::RichText::new(
-                    "WASD fly · right mouse look · Shift sprint · F frame · H hide panel",
-                )
-                .small()
-                .color(egui::Color32::from_rgb(120, 130, 148)),
+                egui::RichText::new("K  hide the key list in the corner")
+                    .small()
+                    .color(egui::Color32::from_rgb(120, 130, 148)),
             );
         });
 }

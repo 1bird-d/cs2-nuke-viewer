@@ -1,0 +1,15 @@
+[package]
+name = "vpk"
+description = "Reader for Valve VPK archives (version 1 and 2)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+crc32fast.workspace = true
+
+[dev-dependencies]
+# Integration tests build archive bytes themselves and need to compute CRCs.
+crc32fast.workspace = true

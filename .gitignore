@@ -1,0 +1,21 @@
+/target
+/captures
+/shots
+
+# The full-map bake is 131 MB of geometry derived from the game. It is built
+# from your own CS2 install by `nukeplant.bat`, never committed, and never
+# published. See NOTICE.md.
+/scenes
+*.nkp
+*.nkt
+
+# Build output of the web viewer. CI regenerates it on every deploy; committing
+# an 11 MB wasm blob would make the history unusable.
+/web/pkg
+
+*.png
+# Evidence renders behind docs/ABWR-review.md. Untextured geometry from this
+# viewer, not game imagery — the report is unreadable without them.
+!/docs/evidence/*.png
+!/docs/evidence-cabletray/*.png
+!nukeplant.ico

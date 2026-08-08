@@ -1,0 +1,16 @@
+[package]
+name = "nkp-format"
+description = "The .nkp baked scene container: layout, writer and memory-mapped reader"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bytemuck.workspace = true
+
+# There are no files to map in a browser, so the web build carries the scene as
+# an owned buffer instead and never pulls this in.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+memmap2.workspace = true

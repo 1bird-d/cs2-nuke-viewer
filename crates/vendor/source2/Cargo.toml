@@ -1,0 +1,17 @@
+[package]
+name = "source2"
+description = "Decoding of Source 2 compiled resources (_c files) and binary KeyValues3"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+bcdec_rs.workspace = true
+lz4_flex.workspace = true
+ruzstd.workspace = true
+
+[dev-dependencies]
+# Integration tests compress their own fixtures.
+lz4_flex.workspace = true

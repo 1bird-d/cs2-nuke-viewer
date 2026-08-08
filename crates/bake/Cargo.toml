@@ -1,0 +1,17 @@
+[package]
+name = "bake"
+description = "CLI that turns de_nuke.vpk into a .nkp scene"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "nkp-bake"
+path = "src/main.rs"
+
+[dependencies]
+nkp-bake.workspace = true
+nkp-format.workspace = true
+anyhow.workspace = true
+clap.workspace = true

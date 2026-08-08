@@ -1,0 +1,61 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/nkp-format",
+    "crates/nkp-bake",
+    "crates/bake",
+    "crates/view",
+    "crates/vendor/vpk",
+    "crates/vendor/source2",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.95"
+license = "MIT"
+
+[workspace.dependencies]
+# Internal
+nkp-format = { path = "crates/nkp-format" }
+nkp-bake = { path = "crates/nkp-bake" }
+
+# The VPK and Source 2 decoders, vendored from the mapview project under its
+# MIT OR Apache-2.0 licence — see crates/vendor/README.md. They used to be path
+# dependencies into a sibling checkout, which meant a clone of this repository
+# could not build. Vendoring is the fallback the README always named for that.
+vpk = { path = "crates/vendor/vpk" }
+source2 = { path = "crates/vendor/source2" }
+
+# External
+anyhow = "1"
+bcdec_rs = "0.2"
+crc32fast = "1"
+lz4_flex = { version = "0.11", default-features = false, features = ["std"] }
+ruzstd = "0.7"
+thiserror = "2"
+bytemuck = { version = "1", features = ["derive"] }
+clap = { version = "4", default-features = false, features = [
+    "std",
+    "derive",
+    "help",
+    "usage",
+    "error-context",
+] }
+glam = { version = "0.33", features = ["bytemuck"] }
+memmap2 = "0.9"
+rayon = "1"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+
+# The bake decompresses a quarter-gigabyte archive and every model in it. In a
+# debug build that takes minutes rather than seconds, which makes iterating on
+# the viewer painful, so its dependencies are always optimised.
+[profile.dev.package."*"]
+opt-level = 3

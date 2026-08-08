@@ -1,0 +1,25 @@
+[package]
+name = "nkp-bake"
+description = "Reads de_nuke out of the CS2 archives and bakes it into a .nkp scene"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+nkp-format.workspace = true
+vpk.workspace = true
+source2.workspace = true
+anyhow.workspace = true
+bytemuck.workspace = true
+glam.workspace = true
+rayon.workspace = true
+regex.workspace = true
+serde.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+# Only the `traydump` scratch example needs this, to write a texture atlas out
+# for inspection.
+png = "0.18"

@@ -1,0 +1,92 @@
+name: Deploy the web viewer
+
+# Builds the wasm viewer and publishes it to GitHub Pages, so nobody needs a
+# Rust toolchain to use the hosted version.
+#
+# The scene it serves, web/de_nuke.plant.nkp.gz, is committed — it is derived
+# geometry that the build cannot regenerate here, because regenerating it needs
+# a Counter-Strike 2 installation and this runner has none. See NOTICE.md for
+# what that file is and is not.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deployment at a time, and never cancel one half-done: an interrupted
+# deploy leaves Pages serving a wasm that does not match its JS glue.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: wasm-${{ runner.os }}-
+
+      - name: Build
+        run: cargo build --release --target wasm32-unknown-unknown -p view --lib
+
+      # The CLI and the crate must be the same version or the generated glue
+      # will not match the wasm. Read the version out of the lockfile rather
+      # than pinning it in two places.
+      - name: Install wasm-bindgen-cli matching the lockfile
+        run: |
+          version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep '^version' | head -1 | cut -d'"' -f2)
+          echo "wasm-bindgen $version"
+          if [ "$(wasm-bindgen --version 2>/dev/null | cut -d' ' -f2)" != "$version" ]; then
+            cargo install -f wasm-bindgen-cli --version "$version"
+          fi
+
+      - name: Generate bindings
+        run: |
+          wasm-bindgen --target web --no-typescript \
+            --out-dir web/pkg \
+            target/wasm32-unknown-unknown/release/plant.wasm
+
+      - name: Check the scene is there
+        run: |
+          test -f web/de_nuke.plant.nkp.gz || {
+            echo "web/de_nuke.plant.nkp.gz is missing — the page would load to a black screen."
+            echo "Regenerate it on a machine with CS2 installed:"
+            echo "  cargo run --release -p view --bin nukeplant -- \\"
+            echo "    --keep pipe,duct,vessel,machinery,instrument,electrical \\"
+            echo "    --export-web web/de_nuke.plant.nkp && gzip -9 web/de_nuke.plant.nkp"
+            exit 1
+          }
+          ls -lh web/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

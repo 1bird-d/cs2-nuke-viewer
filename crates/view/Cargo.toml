@@ -1,0 +1,64 @@
+[package]
+name = "view"
+description = "The nukeplant viewer: fly de_nuke and ghost away everything that is not plant"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+# Not `nukeplant`: the binary already claims that name, and on Windows the
+# cdylib's .pdb would collide with the executable's.
+name = "plant"
+path = "src/lib.rs"
+# cdylib for wasm-bindgen, rlib so the desktop binary can link the same code.
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "nukeplant"
+path = "src/main.rs"
+
+[dependencies]
+nkp-format.workspace = true
+anyhow.workspace = true
+bytemuck.workspace = true
+egui = "0.36"
+egui-wgpu = "0.36"
+
+glam.workspace = true
+regex.workspace = true
+wgpu = "30"
+winit = "0.30"
+# std::time::Instant compiles for wasm and then panics when read. This is the
+# same type natively and a performance.now() shim in the browser.
+web-time = "1"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# Broken on wasm32 in 0.36.1 (see src/webinput.rs), so it is desktop-only.
+egui-winit = { version = "0.36", default-features = false, features = ["links"] }
+clap.workspace = true
+png = "0.18"
+pollster = "1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = [
+    "Blob",
+    "DataTransfer",
+    "Document",
+    "DomRect",
+    "DragEvent",
+    "Element",
+    "File",
+    "FileList",
+    "HtmlCanvasElement",
+    "ReadableStream",
+    "ReadableStreamDefaultReader",
+    "Response",
+    "WritableStream",
+    "WritableStreamDefaultWriter",
+    "Window",
+] }

@@ -1,0 +1,10 @@
+# Normalise line endings in the repository so a Windows checkout does not show
+# every file as modified, and CI on Linux sees the same bytes.
+* text=auto eol=lf
+
+# Binary, byte-exact.
+*.nkp binary
+*.gz binary
+*.png binary
+*.ico binary
+*.wasm binary

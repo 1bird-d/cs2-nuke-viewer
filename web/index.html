@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>de_nuke as a power plant</title>
+<meta name="description" content="Counter-Strike 2's de_nuke, stripped to its pipework and instrumentation, in 3D — with every prop named against the real equipment it resembles.">
+<style>
+  :root {
+    color-scheme: dark;
+    --ink: #dee4ee;
+    --dim: #8b95a8;
+    --edge: #2a3140;
+    --panel: #12151b;
+    --accent: #ff5722;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #07080b;
+    color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+  }
+  /* The canvas fills the window; egui draws the whole UI on top of it. */
+  #canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    outline: none;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: radial-gradient(ellipse at 50% 40%, #131922 0%, #07080b 70%);
+    z-index: 10;
+  }
+  #overlay[hidden] { display: none; }
+  .card {
+    max-width: 640px;
+    width: 100%;
+    border: 1px solid var(--edge);
+    border-radius: 6px;
+    background: var(--panel);
+    padding: 28px 30px;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .sub { margin: 0 0 20px; color: var(--dim); font-size: 14px; }
+  #status {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: var(--accent);
+    min-height: 1.5em;
+  }
+  .keys {
+    margin: 20px 0 0;
+    padding: 16px 0 0;
+    border-top: 1px solid var(--edge);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 16px;
+    font-size: 13px;
+    color: var(--dim);
+  }
+  .keys b {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .note {
+    margin: 18px 0 0;
+    padding: 12px 14px;
+    border-left: 2px solid var(--edge);
+    font-size: 12.5px;
+    color: var(--dim);
+  }
+  .note a { color: var(--dim); }
+  #unsupported { display: none; }
+  #unsupported h1 { color: var(--accent); }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<canvas id="canvas" tabindex="0"></canvas>
+
+<div id="overlay">
+  <div class="card" id="loading">
+    <h1>de_nuke, as a power plant</h1>
+    <p class="sub">
+      Counter-Strike 2's <code>de_nuke</code> with everything that is not plant
+      taken away — the pipework, ducting, vessels, machinery, instrumentation and
+      switchyard, in the positions they occupy in the game.
+    </p>
+    <div id="status">Starting…</div>
+    <div class="keys">
+      <b>W A S D</b><span>fly &middot; <b>Q</b>/<b>E</b> down and up &middot; hold <b>right&nbsp;mouse</b> to look</span>
+      <b>hover</b><span>name the thing under the cursor</span>
+      <b>click</b><span>hold it in the panel, with links to photographs of the real unit</span>
+      <b>1</b>–<b>0</b><span>cycle a category: solid, ghosted, hidden</span>
+      <b>P I M</b><span>plant &middot; pipes only &middot; everything</span>
+      <b>L</b><span>equipment names &middot; <b>F</b> reframe &middot; <b>H</b> hide the panel</span>
+    </div>
+    <p class="note">
+      The scene is about 9&nbsp;MB and is downloaded once. It is untextured on
+      purpose: every surface is a flat colour that says what the geometry is,
+      not what it looks like in the game.
+    </p>
+  </div>
+
+  <div class="card" id="unsupported">
+    <h1>This browser has no WebGPU</h1>
+    <p class="sub">
+      The viewer needs it and there is no fallback to offer. Per-instance
+      transforms and colours are read from a storage buffer, and WebGL2 has no
+      storage buffers at all, so it is not a matter of a slower path — the
+      renderer cannot be expressed.
+    </p>
+    <p class="sub">
+      Chrome, Edge, Safari&nbsp;26 and later, and current Firefox all have it. On
+      Linux Chrome you may need <code>chrome://flags/#enable-unsafe-webgpu</code>.
+    </p>
+    <p class="note">
+      A desktop build with the same features, which uses Vulkan, Metal or D3D12
+      and reads the map straight out of your own CS2 install, is in the
+      repository.
+    </p>
+  </div>
+</div>
+
+<script type="module">
+  const overlay = document.getElementById('overlay');
+  const loading = document.getElementById('loading');
+  const unsupported = document.getElementById('unsupported');
+  const status = document.getElementById('status');
+
+  // Check before loading 9 MB of scene and several MB of wasm, so an
+  // unsupported browser gets an explanation immediately rather than after a
+  // long download that ends in a dead canvas.
+  if (!navigator.gpu) {
+    loading.style.display = 'none';
+    unsupported.style.display = 'block';
+  } else {
+    try {
+      const { default: init, start } = await import('./pkg/plant.js');
+      status.textContent = 'Loading the viewer…';
+      await init();
+      start('canvas');
+      // The canvas only gets key events when it has focus, and nobody thinks to
+      // click an empty black rectangle first.
+      document.getElementById('canvas').focus();
+    } catch (e) {
+      status.textContent = String(e);
+      console.error(e);
+    }
+  }
+</script>
+
+</body>
+</html>

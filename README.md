@@ -155,14 +155,14 @@ content type.
 To regenerate the scene the web viewer serves, on a machine with CS2 installed:
 
 ```bash
-cargo run --release -p view --bin nukeplant -- --keep pipe,duct,vessel,machinery,instrument,electrical --export-web web/de_nuke.plant.nkp
+cargo run --release -p view --bin nukeplant -- --keep pipe,duct,vessel,machinery,instrument,electrical,glass --export-web web/de_nuke.plant.nkp
 ```
 
 ```bash
 gzip -9 web/de_nuke.plant.nkp
 ```
 
-That is 8,625 instances down to 2,624, and 125 MB down to 37 MB, 9.4 MB gzipped.
+That is 8,625 instances down to 2,746, and 125 MB down to 38 MB, 9.6 MB gzipped.
 CI does not rebuild it — a GitHub runner has no copy of the game — so it is
 committed, and the workflow fails loudly if it is missing.
 

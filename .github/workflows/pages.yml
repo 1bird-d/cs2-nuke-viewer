@@ -70,7 +70,7 @@ jobs:
             echo "web/de_nuke.plant.nkp.gz is missing — the page would load to a black screen."
             echo "Regenerate it on a machine with CS2 installed:"
             echo "  cargo run --release -p view --bin nukeplant -- \\"
-            echo "    --keep pipe,duct,vessel,machinery,instrument,electrical \\"
+            echo "    --keep pipe,duct,vessel,machinery,instrument,electrical,glass \\"
             echo "    --export-web web/de_nuke.plant.nkp && gzip -9 web/de_nuke.plant.nkp"
             exit 1
           }

@@ -155,10 +155,27 @@ const DEFS: &[Def] = &[
         colour: [0.95, 0.90, 0.70],
         mode: Mode::Hidden,
     },
+    // Before `structure`, which used to swallow all of this through its
+    // `glass` path group and its `window_00` and `metal_door` terms. Glazing is
+    // worth separating: the control room, the observation windows over the pool
+    // hall and the door lights are the places a person would actually stand and
+    // look at the plant from, and they read as nothing at all when they are
+    // lumped in with concrete.
+    //
+    // Ghosted by default rather than solid, because the ghost pass *is* the
+    // glass look — a fresnel shell, bright at grazing angles and invisible
+    // face-on. Drawn solid it would be flat cyan panels you cannot see past.
+    Def {
+        id: "glass",
+        label: "Glass & windows",
+        pattern: r"^materials/glass/|window_00|_glass\b|_glass$|glass_panel|glass_frosted",
+        colour: [0.58, 0.86, 0.98],
+        mode: Mode::Ghost,
+    },
     Def {
         id: "structure",
         label: "Building fabric",
-        pattern: r"^materials/(concrete|metal|ground|ceiling|plaster|tile|brick|wood|glass|dev)/|hr_concrete|hr_metal_corrugated|metal_door|window_00|curbs_001|hr_plaster|roof_",
+        pattern: r"^materials/(concrete|metal|ground|ceiling|plaster|tile|brick|wood|dev)/|hr_concrete|hr_metal_corrugated|metal_door|curbs_001|hr_plaster|roof_",
         colour: [0.50, 0.56, 0.66],
         mode: Mode::Ghost,
     },
@@ -265,7 +282,7 @@ impl Classification {
     /// project exists to produce, on one key.
     pub fn preset_plant(&mut self) {
         const SOLID: &[&str] = &["pipe", "duct", "vessel", "machinery", "instrument"];
-        const GHOST: &[&str] = &["structure", "access", "other"];
+        const GHOST: &[&str] = &["structure", "access", "glass", "other"];
         for category in &mut self.categories {
             category.mode = if SOLID.contains(&category.id) {
                 Mode::Solid
@@ -352,6 +369,47 @@ mod tests {
 
     /// Order matters: the reactor vessel head must not be swallowed by a
     /// broader pattern sitting above it.
+    #[test]
+    /// Every glazing material in de_nuke, taken from the material paths in the
+    /// bake. `structure` used to claim all of them, which is why none of it was
+    /// visible: the glass went wherever the concrete went.
+    ///
+    /// The door and window *frames* are deliberately here too — a window is the
+    /// assembly, and separating the frame from the pane would leave the frame
+    /// floating in the building-fabric layer with a hole in it.
+    #[test]
+    fn glazing_is_glass_and_not_building_fabric() {
+        let compiled: Vec<Regex> = DEFS.iter().map(|d| Regex::new(d.pattern).unwrap()).collect();
+        let classify = |path: &str| -> &str {
+            compiled
+                .iter()
+                .position(|re| re.is_match(path))
+                .map_or(OTHER.id, |i| DEFS[i].id)
+        };
+
+        for path in [
+            "materials/glass/hr_g/hr_glass_001.vmat",
+            "materials/glass/hr_g/hr_glass_001_opaque.vmat",
+            "materials/glass/hr_g/hr_glass_frosted_004.vmat",
+            "materials/glass/hr_g/hr_glass_panel_001.vmat",
+            "materials/glass/hr_g/hr_glass_window_frame_001.vmat",
+            "materials/models/props/de_nuke/hr_nuke/metal_door_001/metal_door_001_glass.vmat",
+            "materials/models/props/de_nuke/hr_nuke/window_001/window_001.vmat",
+            "materials/models/props/de_nuke/hr_nuke/window_001/window_001b.vmat",
+            "materials/models/props/de_nuke/hr_nuke/window_001/window_001c.vmat",
+            "materials/models/props/de_nuke/hr_nuke/window_002/window_002.vmat",
+        ] {
+            assert_eq!(classify(path), "glass", "{path}");
+        }
+
+        // The rest of a door is not glazing, and concrete is still concrete.
+        assert_eq!(
+            classify("materials/models/props/de_nuke/hr_nuke/metal_door_001/metal_door_001.vmat"),
+            "structure"
+        );
+        assert_eq!(classify("materials/concrete/hr_concrete_wall_001b.vmat"), "structure");
+    }
+
     #[test]
     fn the_first_matching_category_wins_in_definition_order() {
         let compiled: Vec<Regex> = DEFS.iter().map(|d| Regex::new(d.pattern).unwrap()).collect();

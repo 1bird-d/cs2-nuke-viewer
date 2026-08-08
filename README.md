@@ -1,18 +1,11 @@
 # cs2-nuke-viewer
 
+!! this project is vibe coded sorry if it doesn't run that well !!
+
 A viewer for the instrumentation, piping and electronics of `de_nuke` in CS2.
 
 **[Open it in your browser →](https://1bird-d.github.io/cs2-nuke-viewer/)** —
 needs WebGPU. Nothing to install.
-
-Counter-Strike 2's `de_nuke`, treated as the nuclear power station it is dressed
-as. Everything that is not plant is taken away, and what is left — the pipework,
-ducting, vessels, machinery, instrumentation and switchyard — stands on its own
-in three dimensions, in the positions it occupies in the game.
-
-Hover anything and it tells you what the geometry is, what real plant item it
-most likely represents, and how good that match actually is. Where a real
-counterpart exists, there is a link to a photograph of one.
 
 > Counter-Strike and `de_nuke` belong to **Valve Corporation**. This project is
 > unaffiliated, makes no money, and exists for information and education. See

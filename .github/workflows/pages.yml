@@ -76,11 +76,25 @@ jobs:
           }
           ls -lh web/
 
-      # `enablement` turns Pages on via the API if the repository has never had
-      # it, so there is no settings page to visit before the first deploy.
-      - uses: actions/configure-pages@v5
+      # `enablement` asks the API to switch Pages on. It only works if Actions
+      # is allowed to write, so it is a convenience, not a guarantee — the step
+      # below explains the two settings if it is refused.
+      - id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
         with:
           enablement: true
+
+      - name: Explain how to turn Pages on
+        if: steps.pages.outcome == 'failure'
+        run: |
+          echo "::error::GitHub Pages is not enabled for this repository, and this"
+          echo "::error::workflow was not allowed to enable it. Everything else built"
+          echo "::error::fine — only publishing is blocked. Fix it with either:"
+          echo "::error::  Settings > Pages > Build and deployment > Source: GitHub Actions"
+          echo "::error::  Settings > Actions > General > Workflow permissions: Read and write"
+          echo "::error::Then re-run this workflow."
+          exit 1
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web

@@ -122,6 +122,19 @@ stay as legible context instead of either hiding the plant or vanishing. It is
 additive and therefore commutative, so it needs no sorting and cannot flicker
 during a flythrough.
 
+## First-time Pages setup
+
+The deploy workflow builds and publishes on every push to `main`, but **Pages
+has to be switched on once by hand** — a workflow token cannot enable it unless
+Actions already has write permission, so the very first deploy has a chicken and
+egg problem. Either of these fixes it:
+
+- **Settings → Pages → Build and deployment → Source: GitHub Actions**, or
+- **Settings → Actions → General → Workflow permissions: Read and write**
+
+Then re-run the workflow. Until that is done the build succeeds and only the
+publish step fails, with those instructions in the log.
+
 ## Working on the web viewer
 
 ```bash

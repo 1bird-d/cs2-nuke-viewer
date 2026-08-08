@@ -76,23 +76,21 @@ jobs:
           }
           ls -lh web/
 
-      # `enablement` asks the API to switch Pages on. It only works if Actions
-      # is allowed to write, so it is a convenience, not a guarantee — the step
-      # below explains the two settings if it is refused.
+      # No `enablement: true` here. Creating a Pages site is `POST /repos/{}/pages`,
+      # which needs admin rights on the repository; GITHUB_TOKEN does not have
+      # them however the workflow permissions are set, so asking only produces a
+      # confusing failure. Pages has to be switched on once by a human.
       - id: pages
         uses: actions/configure-pages@v5
         continue-on-error: true
-        with:
-          enablement: true
 
       - name: Explain how to turn Pages on
         if: steps.pages.outcome == 'failure'
         run: |
-          echo "::error::GitHub Pages is not enabled for this repository, and this"
-          echo "::error::workflow was not allowed to enable it. Everything else built"
-          echo "::error::fine — only publishing is blocked. Fix it with either:"
-          echo "::error::  Settings > Pages > Build and deployment > Source: GitHub Actions"
-          echo "::error::  Settings > Actions > General > Workflow permissions: Read and write"
+          echo "::error::GitHub Pages is not enabled for this repository. Everything"
+          echo "::error::else built fine — only publishing is blocked, and no workflow"
+          echo "::error::can fix it because enabling Pages needs repository admin."
+          echo "::error::Settings > Pages > Build and deployment > Source: GitHub Actions"
           echo "::error::Then re-run this workflow."
           exit 1
       - uses: actions/upload-pages-artifact@v3

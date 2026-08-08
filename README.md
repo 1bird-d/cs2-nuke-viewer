@@ -125,15 +125,21 @@ during a flythrough.
 ## First-time Pages setup
 
 The deploy workflow builds and publishes on every push to `main`, but **Pages
-has to be switched on once by hand** — a workflow token cannot enable it unless
-Actions already has write permission, so the very first deploy has a chicken and
-egg problem. Either of these fixes it:
+has to be switched on once by hand.** No workflow can do it: creating a Pages
+site is `POST /repos/{owner}/{repo}/pages`, which needs repository admin, and
+`GITHUB_TOKEN` never has that whatever the workflow permissions say. Pushing a
+`gh-pages` branch does not auto-provision one either — that behaviour is gone.
 
-- **Settings → Pages → Build and deployment → Source: GitHub Actions**, or
-- **Settings → Actions → General → Workflow permissions: Read and write**
+**Settings → Pages → Build and deployment → Source: GitHub Actions**, then
+re-run the workflow.
 
-Then re-run the workflow. Until that is done the build succeeds and only the
-publish step fails, with those instructions in the log.
+Until that is done the build succeeds and only the publish step fails, with
+those instructions in the log.
+
+A `gh-pages` branch holding a prebuilt copy of the site is also pushed, so
+choosing **Source: Deploy from a branch → `gh-pages` → `/ (root)`** instead
+serves it immediately with no build at all. Pick one; if you pick Actions, the
+branch is dead weight and can be deleted.
 
 ## Working on the web viewer
 

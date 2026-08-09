@@ -103,7 +103,8 @@
     <p class="sub">
       Counter-Strike 2's <code>de_nuke</code> with everything that is not plant
       taken away — the pipework, ducting, vessels, machinery, instrumentation and
-      switchyard, in the positions they occupy in the game.
+      switchyard, in the positions they occupy in the game — inside a ghosted shell
+      of the building itself, so you can see where everything sits.
     </p>
     <div id="status">Starting…</div>
     <div class="keys">
@@ -115,7 +116,7 @@
       <b>L</b><span>equipment names &middot; <b>F</b> reframe &middot; <b>H</b> hide the panel</span>
     </div>
     <p class="note">
-      The scene is about 9&nbsp;MB and is downloaded once. It is untextured on
+      The scene is about 19&nbsp;MB and is downloaded once. It is untextured on
       purpose: every surface is a flat colour that says what the geometry is,
       not what it looks like in the game.
     </p>
@@ -167,7 +168,7 @@
   new ResizeObserver(sizeCanvas).observe(canvas);
   addEventListener('resize', sizeCanvas);
 
-  // Check before loading 9 MB of scene and several MB of wasm, so an
+  // Check before loading 19 MB of scene and several MB of wasm, so an
   // unsupported browser gets an explanation immediately rather than after a
   // long download that ends in a dead canvas.
   if (!navigator.gpu) {

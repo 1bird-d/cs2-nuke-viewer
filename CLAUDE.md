@@ -24,10 +24,10 @@ Two supported ways to look at a frame:
 
 ## Everything upstream is read-only
 
-`a sibling mapview checkout` and
-`C:\Program Files (x86)\Steam\steamapps\common\Counter-Strike Global Offensive\`
-are **read only**. nukeplant depends on mapview's `vpk` and `source2` crates by
-path and reads the user's own game files. It writes nothing to either, ever.
+A sibling `mapview` checkout, if you have one, and the Counter-Strike 2
+installation are **read only**. nukeplant reads the game files and writes
+nothing back to either, ever. The decoders themselves are vendored, so the
+mapview checkout is no longer needed to build — see `crates/vendor/README.md`.
 
 Only `de_nuke` is in scope. The rest of the map pool is mapview's business.
 

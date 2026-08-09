@@ -102,8 +102,8 @@ memory of the map.
      clutter and lighting by material regex. That gave clean cutaway views of the lower reactor level,
      the control room, the switchyard and the pool. **No file in the nukeplant source tree was
      modified**; the crops lived in the scratchpad and have been deleted.
-4. **Texture forensics.** Read the colour textures out of the read-only Source 2 Viewer decompile at
-   `` (715 PNGs) and the per-prop decompiles
+4. **Texture forensics.** Read the colour textures out of a read-only Source 2 Viewer decompile
+   of the map (715 PNGs) and the per-prop decompiles
    (`machinery1|2|3`, `pipes`, `nukescreenshots`). Texture atlases are the single best evidence of what
    a low-poly prop is *meant* to be — the `control_room_displays`, `nuke_industrial_props_001`,
    `metal_pipe_002b`, `gas_meter_01` and `signs_001` atlases each settled a question that geometry
@@ -292,7 +292,7 @@ The strongest system in the map by a wide margin.
 ### 4.1 What the map genuinely models
 
 The `control_room_displays_color` texture atlas
-(`control_room_displays_color_psd_9adb2ad9.png`) is the
+(`control_room_displays_color_psd_9adb2ad9.png` in the decompile) is the
 most information-dense asset in the map. It contains, all legible at close camera range:
 
 - An **instrument cabinet with hinged doors** enclosing a large round moving-coil indicator (0–100),

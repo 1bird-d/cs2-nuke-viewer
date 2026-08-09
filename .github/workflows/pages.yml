@@ -1,28 +1,31 @@
 name: Deploy the web viewer
 
-# Builds the wasm viewer and publishes it to GitHub Pages, so nobody needs a
-# Rust toolchain to use the hosted version.
+# Builds the wasm viewer and publishes it to the `gh-pages` branch, which
+# GitHub Pages serves. Push to main and the live site follows.
 #
-# The scene it serves, web/de_nuke.plant.nkp.gz, is committed — it is derived
-# geometry that the build cannot regenerate here, because regenerating it needs
-# a Counter-Strike 2 installation and this runner has none. See NOTICE.md for
-# what that file is and is not.
+# Why the branch and not `actions/deploy-pages`: this repository's Pages source
+# is "Deploy from a branch". The artifact route only works when the source is
+# set to "GitHub Actions", and if the two are mismatched the deploy step fails
+# with an error that reads like a permissions problem. Pushing a branch works
+# under either setting, so it is the one that cannot be silently wrong.
+#
+# The scene it serves, web/de_nuke.plant.nkp.gz, is committed — the build
+# cannot regenerate it, because that needs a Counter-Strike 2 installation and
+# this runner has none. See NOTICE.md for what that file is and is not.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# One deployment at a time, and never cancel one half-done: an interrupted
-# deploy leaves Pages serving a wasm that does not match its JS glue.
+# Never two at once, and never cancel one half-done: an interrupted deploy
+# leaves the site serving a wasm that does not match its JS glue.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
   build:
@@ -44,6 +47,17 @@ jobs:
           key: wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: wasm-${{ runner.os }}-
 
+      - name: Check the scene is there
+        run: |
+          test -f web/de_nuke.plant.nkp.gz || {
+            echo "::error::web/de_nuke.plant.nkp.gz is missing — the page would load to a black screen."
+            echo "Regenerate it on a machine with CS2 installed:"
+            echo "  cargo run --release -p view --bin nukeplant -- \\"
+            echo "    --keep pipe,duct,vessel,machinery,instrument,electrical,glass,structure,access,other \\"
+            echo "    --export-web web/de_nuke.plant.nkp && gzip -9 web/de_nuke.plant.nkp"
+            exit 1
+          }
+
       - name: Build
         run: cargo build --release --target wasm32-unknown-unknown -p view --lib
 
@@ -64,45 +78,19 @@ jobs:
             --out-dir web/pkg \
             target/wasm32-unknown-unknown/release/plant.wasm
 
-      - name: Check the scene is there
+      - name: Publish to gh-pages
         run: |
-          test -f web/de_nuke.plant.nkp.gz || {
-            echo "web/de_nuke.plant.nkp.gz is missing — the page would load to a black screen."
-            echo "Regenerate it on a machine with CS2 installed:"
-            echo "  cargo run --release -p view --bin nukeplant -- \\"
-            echo "    --keep pipe,duct,vessel,machinery,instrument,electrical,glass \\"
-            echo "    --export-web web/de_nuke.plant.nkp && gzip -9 web/de_nuke.plant.nkp"
-            exit 1
-          }
-          ls -lh web/
-
-      # No `enablement: true` here. Creating a Pages site is `POST /repos/{}/pages`,
-      # which needs admin rights on the repository; GITHUB_TOKEN does not have
-      # them however the workflow permissions are set, so asking only produces a
-      # confusing failure. Pages has to be switched on once by a human.
-      - id: pages
-        uses: actions/configure-pages@v5
-        continue-on-error: true
-
-      - name: Explain how to turn Pages on
-        if: steps.pages.outcome == 'failure'
-        run: |
-          echo "::error::GitHub Pages is not enabled for this repository. Everything"
-          echo "::error::else built fine — only publishing is blocked, and no workflow"
-          echo "::error::can fix it because enabling Pages needs repository admin."
-          echo "::error::Settings > Pages > Build and deployment > Source: GitHub Actions"
-          echo "::error::Then re-run this workflow."
-          exit 1
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: web
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          # `.nojekyll` stops Pages running the site through Jekyll, which it
+          # does not need and which would slow every deploy down.
+          touch web/.nojekyll
+          cd web
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Built from ${GITHUB_SHA::7}"
+          # Force: this branch is build output, and its history is worth
+          # nothing next to keeping the clone small.
+          git push --force \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            gh-pages

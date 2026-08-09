@@ -116,24 +116,22 @@ stay as legible context instead of either hiding the plant or vanishing. It is
 additive and therefore commutative, so it needs no sorting and cannot flicker
 during a flythrough.
 
-## First-time Pages setup
+## How it is published
 
-The deploy workflow builds and publishes on every push to `main`, but **Pages
-has to be switched on once by hand.** No workflow can do it: creating a Pages
-site is `POST /repos/{owner}/{repo}/pages`, which needs repository admin, and
-`GITHUB_TOKEN` never has that whatever the workflow permissions say. Pushing a
-`gh-pages` branch does not auto-provision one either — that behaviour is gone.
+Push to `main` and [the workflow](.github/workflows/pages.yml) builds the wasm,
+generates the bindings and force-pushes the whole of `web/` to the **`gh-pages`**
+branch, which Pages serves. Nothing else to do.
 
-**Settings → Pages → Build and deployment → Source: GitHub Actions**, then
-re-run the workflow.
+It publishes by pushing a branch rather than through `actions/deploy-pages`
+because this repository's Pages source is **Deploy from a branch**. The artifact
+route only works when the source is set to *GitHub Actions*, and when the two
+disagree the deploy step fails with an error that reads like a permissions
+problem. A branch push works under either setting.
 
-Until that is done the build succeeds and only the publish step fails, with
-those instructions in the log.
-
-A `gh-pages` branch holding a prebuilt copy of the site is also pushed, so
-choosing **Source: Deploy from a branch → `gh-pages` → `/ (root)`** instead
-serves it immediately with no build at all. Pick one; if you pick Actions, the
-branch is dead weight and can be deleted.
+**Pages itself had to be switched on once by hand**, and no workflow could have
+done it: creating a Pages site is `POST /repos/{owner}/{repo}/pages`, which needs
+repository admin, and `GITHUB_TOKEN` never has that. Pushing a `gh-pages` branch
+does not auto-provision one either — that behaviour is gone.
 
 ## Working on the web viewer
 

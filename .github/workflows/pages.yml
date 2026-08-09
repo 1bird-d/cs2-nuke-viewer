@@ -58,7 +58,14 @@ jobs:
             exit 1
           }
 
+      # Rust bakes source paths into panic messages, including the build
+      # machine's Cargo registry. Unremapped, a wasm built on a laptop ships
+      # that account name to every visitor. Remap them to neutral roots.
       - name: Build
+        env:
+          RUSTFLAGS: >-
+            --remap-path-prefix=${{ github.workspace }}=/nukeplant
+            --remap-path-prefix=/home/runner/.cargo=/cargo
         run: cargo build --release --target wasm32-unknown-unknown -p view --lib
 
       # The CLI and the crate must be the same version or the generated glue
@@ -77,6 +84,19 @@ jobs:
           wasm-bindgen --target web --no-typescript \
             --out-dir web/pkg \
             target/wasm32-unknown-unknown/release/plant.wasm
+
+      # A wasm built without the remapping above, or by hand on someone's
+      # laptop, carries a home directory in it. This is published to the open
+      # internet, so check rather than trust.
+      - name: Refuse to publish a build with a home directory in it
+        run: |
+          if grep -a -q -E 'C:\\Users\\|/home/[a-z]|/Users/[a-z]' web/pkg/plant_bg.wasm; then
+            echo "::error::The wasm contains build-machine paths. Something built it"
+            echo "::error::without --remap-path-prefix. Offending strings:"
+            grep -a -o -E '(C:\\Users\\|/home/|/Users/)[^ ]{0,40}' web/pkg/plant_bg.wasm | sort -u | head
+            exit 1
+          fi
+          echo "no build-machine paths in the wasm"
 
       - name: Publish to gh-pages
         run: |

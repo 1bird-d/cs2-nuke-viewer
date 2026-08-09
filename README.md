@@ -136,12 +136,19 @@ does not auto-provision one either — that behaviour is gone.
 ## Working on the web viewer
 
 ```bash
-cargo build --release --target wasm32-unknown-unknown -p view --lib
+RUSTFLAGS="--remap-path-prefix=$PWD=/nukeplant --remap-path-prefix=$CARGO_HOME=/cargo" cargo build --release --target wasm32-unknown-unknown -p view --lib
 ```
 
 ```bash
 wasm-bindgen --target web --no-typescript --out-dir web/pkg target/wasm32-unknown-unknown/release/plant.wasm
 ```
+
+The remapping is not optional for anything you intend to publish. Rust writes
+the path of every source file into the binary for its panic messages, so an
+unremapped wasm contains the build machine's Cargo registry — `C:\Users\<you>\
+.cargo\registry\...` — and serves your account name to every visitor. CI does
+this automatically and [refuses to publish](.github/workflows/pages.yml) a wasm
+with a home directory in it.
 
 ```bash
 node tools/serve.mjs

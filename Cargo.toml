@@ -54,6 +54,16 @@ toml = "1"
 opt-level = 3
 lto = "thin"
 
+# Rust bakes the path of every source file into the binary, for panic messages
+# and assertions. On a dependency that means the build machine's Cargo registry
+# — `C:\Users\<name>\.cargo\registry\...` — and the published wasm would serve
+# that account name to everyone who opens the page.
+#
+# Cargo's `trim-paths` profile key would be the tidy fix, but it is not
+# stabilised in this toolchain, so the build passes `--remap-path-prefix`
+# instead. See the release recipe in the README, and the deploy workflow, which
+# does it for every published build.
+
 # The bake decompresses a quarter-gigabyte archive and every model in it. In a
 # debug build that takes minutes rather than seconds, which makes iterating on
 # the viewer painful, so its dependencies are always optimised.

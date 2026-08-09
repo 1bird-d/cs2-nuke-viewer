@@ -20,8 +20,14 @@ on:
 
 # Never two at once, and never cancel one half-done: an interrupted deploy
 # leaves the site serving a wasm that does not match its JS glue.
+#
+# The group must NOT be called `pages`. GitHub's own "pages build and
+# deployment" run — the one a push to gh-pages triggers — uses that name, and
+# sharing it is actively harmful in two ways: this workflow's run makes the
+# real deployment wait, and a second push to main cancels it outright, so the
+# site silently keeps serving the previous build.
 concurrency:
-  group: pages
+  group: deploy-web-viewer
   cancel-in-progress: false
 
 permissions:

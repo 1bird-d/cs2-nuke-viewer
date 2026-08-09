@@ -128,6 +128,13 @@ route only works when the source is set to *GitHub Actions*, and when the two
 disagree the deploy step fails with an error that reads like a permissions
 problem. A branch push works under either setting.
 
+Worse than failing, it can fail by *hanging*. `actions/deploy-pages` claims the
+`github-pages` environment and then waits on a deployment the Pages service
+will never accept, so it sits queued indefinitely — and the genuine branch-based
+deployment queues behind it, leaving the site on its previous build with no
+error anywhere. That is why the concurrency group here is not called `pages`:
+GitHub's own Pages run already uses that name.
+
 **Pages itself had to be switched on once by hand**, and no workflow could have
 done it: creating a Pages site is `POST /repos/{owner}/{repo}/pages`, which needs
 repository admin, and `GITHUB_TOKEN` never has that. Pushing a `gh-pages` branch

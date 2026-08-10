@@ -868,13 +868,21 @@ async fn request_adapter(
 }
 
 async fn request_device(adapter: &wgpu::Adapter) -> Result<(wgpu::Device, wgpu::Queue)> {
+    // The full de_nuke bake wants a 99 MB vertex buffer, so ask for headroom
+    // above the 256 MB default — but ask for more than the adapter actually
+    // has and device creation is *rejected*, which on the web means a visitor
+    // gets an error instead of a viewer. A required limit is a hard floor, not
+    // a wish. Take whichever is smaller, so the request can never be refused.
+    //
+    // The published web subset needs 60 MB of vertices and 19 MB of indices
+    // and fits inside the default on any conformant implementation, so this
+    // only ever matters to the desktop build reading the whole map.
+    let max_buffer_size = adapter.limits().max_buffer_size.min(512 << 20);
     adapter
         .request_device(&wgpu::DeviceDescriptor {
             label: Some("nukeplant"),
             required_limits: wgpu::Limits {
-                // The vertex buffer is 99 MB for de_nuke, over the default
-                // maximum. Everything else stays default.
-                max_buffer_size: 512 << 20,
+                max_buffer_size,
                 ..wgpu::Limits::default()
             },
             memory_hints: wgpu::MemoryHints::Performance,

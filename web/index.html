@@ -90,6 +90,10 @@
   .note a { color: var(--dim); }
   #unsupported { display: none; }
   #unsupported h1 { color: var(--accent); }
+  /* Shown only where the primary input cannot hover, i.e. a touchscreen.
+     `pointer: coarse` alone would also catch a TV remote or a games pad. */
+  #touch { display: none; }
+  @media (hover: none) and (pointer: coarse) { #touch { display: block; } }
   a { color: var(--accent); }
 </style>
 </head>
@@ -120,6 +124,11 @@
       purpose: every surface is a flat colour that says what the geometry is,
       not what it looks like in the game.
     </p>
+    <p class="note" id="touch">
+      <b>You appear to be on a touch device.</b> This will draw, but it takes a
+      keyboard and a mouse to move: there is no touch navigation in it at all.
+      Open it on a laptop or desktop instead.
+    </p>
   </div>
 
   <div class="card" id="unsupported">
@@ -131,8 +140,11 @@
       renderer cannot be expressed.
     </p>
     <p class="sub">
-      Chrome, Edge, Safari&nbsp;26 and later, and current Firefox all have it. On
-      Linux Chrome you may need <code>chrome://flags/#enable-unsafe-webgpu</code>.
+      <b>Chrome or Edge</b> is the reliable answer, on Windows and on a Mac
+      whatever version of macOS you are running. <b>Safari</b> has it from
+      Safari&nbsp;26 (macOS Tahoe) onwards. Firefox has it on Windows from 141
+      and on macOS later, so it is the least dependable of the three. On Linux
+      Chrome you may need <code>chrome://flags/#enable-unsafe-webgpu</code>.
     </p>
     <p class="note">
       A desktop build with the same features, which uses Vulkan, Metal or D3D12

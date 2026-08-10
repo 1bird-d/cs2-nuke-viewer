@@ -5,7 +5,33 @@
 A viewer for the instrumentation, piping and electronics of `de_nuke` in CS2.
 
 **[Open it in your browser →](https://1bird-d.github.io/cs2-nuke-viewer/)** —
-needs WebGPU. Nothing to install.
+nothing to install.
+
+**Use Chrome or Edge.** On a Mac either of those works whatever your macOS
+version, and Safari works from **Safari 26** (macOS Tahoe) onwards. Firefox has
+it on Windows from 141 and on macOS later, so it is the least dependable of the
+three. Chrome on Linux may still want
+`chrome://flags/#enable-unsafe-webgpu`.
+
+The requirement is **WebGPU**, and there is no fallback — see
+[below](#webgpu-only) for why one cannot exist. The page checks before
+downloading anything, so an old browser gets an explanation rather than a black
+rectangle.
+
+Any laptop from the last few years is enough. It draws 1.65 M triangles, which
+is nothing, and integrated graphics handle it — an M-series MacBook has room to
+spare. The expensive part is the ghost pass, which does not cull back faces and
+blends additively, so cost scales with pixels rather than geometry; on a Retina
+display at 2× that is around five million pixels a frame, and a pre-2020 Intel
+MacBook will feel it. Budget 19 MB of download and roughly 165 MB of memory
+between the tab and the GPU.
+
+**Not phones or tablets.** iOS Safari 26 has WebGPU, so it loads and draws — but
+the input layer handles cursor, mouse buttons, wheel and keys, and nothing else.
+There is no touch handling anywhere in it. On a tablet you get a scene you can
+look at and cannot move through, which is worse than a clean refusal; it is
+listed here rather than fixed because gesture navigation is a real piece of
+work, not a tweak.
 
 > Counter-Strike and `de_nuke` belong to **Valve Corporation**. This project is
 > unaffiliated, makes no money, and exists for information and education. See

@@ -23,12 +23,18 @@
     font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     overscroll-behavior: none;
   }
-  /* The canvas fills the window; egui draws the whole UI on top of it. */
+  /* The canvas fills the window; egui draws the whole UI on top of it.
+     `100%` on a fixed element resolves against the *layout* viewport, which on
+     iOS stays the size the page had when the address bar was collapsed — so
+     part of the canvas sits behind browser chrome and never comes back. `dvh`
+     tracks the viewport that is actually visible. It is a second declaration
+     rather than a replacement so browsers without it keep the old behaviour. */
   #canvas {
     position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
+    height: 100dvh;
     display: block;
     touch-action: none;
     outline: none;
@@ -38,7 +44,14 @@
     inset: 0;
     display: grid;
     place-items: center;
-    padding: 24px;
+    /* Keep the card clear of the notch, the Dynamic Island and the home
+       indicator. `max` rather than a sum, because on a desktop the insets are
+       zero and 24px is already the right margin. */
+    padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+             max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+    height: 100%;
+    height: 100dvh;
+    overflow-y: auto;
     background: radial-gradient(ellipse at 50% 40%, #131922 0%, #07080b 70%);
     z-index: 10;
   }
@@ -90,10 +103,18 @@
   .note a { color: var(--dim); }
   #unsupported { display: none; }
   #unsupported h1 { color: var(--accent); }
-  /* Shown only where the primary input cannot hover, i.e. a touchscreen.
-     `pointer: coarse` alone would also catch a TV remote or a games pad. */
-  #touch { display: none; }
-  @media (hover: none) and (pointer: coarse) { #touch { display: block; } }
+  /* Touchscreens get the gesture list and lose the key list. The test is the
+     same one `crates/view/src/web.rs` uses to decide whether to draw the panel,
+     so the page cannot promise a control the viewer does not offer.
+     `hover: none` is the discriminating half — `pointer: coarse` alone would
+     also catch a TV remote or a games pad, and a desktop machine with a
+     touchscreen still reports `hover: hover` and keeps its keyboard. */
+  #touch, #gestures { display: none; }
+  @media (hover: none) and (pointer: coarse) {
+    #touch { display: block; }
+    #gestures { display: grid; }
+    #keys { display: none; }
+  }
   a { color: var(--accent); }
 </style>
 </head>
@@ -111,7 +132,7 @@
       of the building itself, so you can see where everything sits.
     </p>
     <div id="status">Starting…</div>
-    <div class="keys">
+    <div class="keys" id="keys">
       <b>W A S D</b><span>fly &middot; <b>Q</b>/<b>E</b> down and up &middot; hold <b>right&nbsp;mouse</b> to look</span>
       <b>hover</b><span>name the thing under the cursor</span>
       <b>click</b><span>hold it in the panel, with links to photographs of the real unit</span>
@@ -119,15 +140,29 @@
       <b>P I M</b><span>plant &middot; pipes only &middot; everything</span>
       <b>L</b><span>equipment names &middot; <b>F</b> reframe &middot; <b>H</b> hide the panel</span>
     </div>
+    <!--
+      The only place a phone can be told how this works. The viewer itself
+      draws no controls there — a panel of eleven categories and three sliders
+      is unreadable at that size — so the whole of the instruction has to fit
+      here, on a card that is already on screen while the scene downloads.
+    -->
+    <div class="keys" id="gestures">
+      <b>one finger</b><span>drag to look around</span>
+      <b>two fingers</b><span>drag to fly &mdash; the further you push, the faster</span>
+      <b>pinch</b><span>set how fast two fingers fly you</span>
+      <b>double tap</b><span>back to seeing the whole plant</span>
+    </div>
     <p class="note">
       The scene is about 19&nbsp;MB and is downloaded once. It is untextured on
       purpose: every surface is a flat colour that says what the geometry is,
       not what it looks like in the game.
     </p>
     <p class="note" id="touch">
-      <b>You appear to be on a touch device.</b> This will draw, but it takes a
-      keyboard and a mouse to move: there is no touch navigation in it at all.
-      Open it on a laptop or desktop instead.
+      <b>On a phone this is a viewer and nothing more.</b> The panel, the key
+      legend and the equipment names are all switched off — they are sized for a
+      screen twenty times the area. You get the plant and the means to fly
+      around it. Open it on a laptop to name what you are looking at and to see
+      photographs of the real equipment.
     </p>
   </div>
 

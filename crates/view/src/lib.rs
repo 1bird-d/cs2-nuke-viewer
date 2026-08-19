@@ -20,6 +20,9 @@ pub mod gpu;
 pub mod identify;
 pub mod panel;
 pub mod pick;
+// Not gated to wasm: the gesture logic is pure arithmetic over positions and
+// timestamps, so it is unit-tested on the desktop where tests actually run.
+pub mod touch;
 
 use glam::Vec3;
 

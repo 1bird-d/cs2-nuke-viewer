@@ -24,7 +24,7 @@ use glam::Vec3;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use winit::application::ApplicationHandler;
-use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::event::{ElementState, MouseButton, MouseScrollDelta, TouchPhase, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::platform::web::{EventLoopExtWebSys, WindowAttributesExtWebSys};
@@ -34,6 +34,7 @@ use crate::camera::Camera;
 use crate::category::Classification;
 use crate::gpu::{GhostParams, Renderer};
 use crate::panel::{self, Panel};
+use crate::touch::{self, Touches};
 use crate::{
     build_labels, cursor_ray, identify, identify_instance, pick, Input, Instant, ViewKey,
 };
@@ -90,6 +91,24 @@ fn status(text: &str) {
     }
 }
 
+/// Whether the primary input is a touchscreen — a phone or a tablet.
+///
+/// The same test `web/index.html` uses in CSS, so the page and the viewer
+/// cannot disagree about which one the reader is holding. `hover: none` is the
+/// discriminating half: a desktop machine with a touchscreen still reports
+/// `hover: hover`, because it also has a mouse, and keeps its panel. Only a
+/// device whose *primary* input cannot hover loses it.
+///
+/// Hover is also the thing the panel is built around — names appear under the
+/// cursor before anything is clicked — so a device that cannot hover is exactly
+/// a device the panel was never designed for.
+fn is_touch_only() -> bool {
+    web_sys::window()
+        .and_then(|window| window.match_media("(hover: none) and (pointer: coarse)").ok())
+        .flatten()
+        .is_some_and(|query| query.matches())
+}
+
 /// Hide the loading overlay once there is something to look at.
 fn hide_overlay() {
     let Some(document) = web_sys::window().and_then(|w| w.document()) else {
@@ -141,6 +160,35 @@ async fn fetch_scene(url: &str) -> Result<Vec<u8>, String> {
     }
 }
 
+/// How large the inflated scene will be, from the gzip trailer.
+///
+/// A gzip member ends with the uncompressed length in the last four bytes,
+/// little-endian, modulo 2^32. The scene is 80 MB, so it is exact here.
+///
+/// Worth reading rather than letting the `Vec` find out by doubling. Growing to
+/// 80 MB that way ends with a copy that holds the 64 MB old buffer and the
+/// 128 MB new one at once — about 192 MB of wasm linear memory, which is never
+/// returned to the system once taken. On a phone, where the browser kills tabs
+/// that get greedy, that transient is the largest single allocation in the
+/// whole load and it buys nothing.
+///
+/// A wrong or hostile trailer costs only a bad guess: capacity is a hint, and
+/// the read loop appends whatever actually arrives. The clamp is there so a
+/// corrupt length cannot ask for a gigabyte before the first byte is read.
+fn inflated_size(gzip: &[u8]) -> usize {
+    /// Four times the 80 MB the scene actually is, and far below the point
+    /// where reserving would itself be the problem.
+    const CEILING: usize = 320 << 20;
+
+    let Some(trailer) = gzip.get(gzip.len().wrapping_sub(4)..) else {
+        return 0;
+    };
+    let Ok(bytes) = <[u8; 4]>::try_from(trailer) else {
+        return 0;
+    };
+    (u32::from_le_bytes(bytes) as usize).min(CEILING)
+}
+
 /// Gunzip through the browser's own streams implementation.
 ///
 /// The compressed bytes are pushed in without awaiting the write, which ignores
@@ -167,7 +215,7 @@ async fn inflate(bytes: &[u8]) -> Result<Vec<u8>, String> {
         .dyn_into::<web_sys::ReadableStreamDefaultReader>()
         .map_err(|_| "no reader on the gunzip stream".to_string())?;
 
-    let mut out: Vec<u8> = Vec::new();
+    let mut out: Vec<u8> = Vec::with_capacity(inflated_size(bytes));
     loop {
         let result = wasm_bindgen_futures::JsFuture::from(reader.read())
             .await
@@ -234,6 +282,15 @@ struct App {
     show_keys: bool,
     /// The last prop the cursor named, so its links stay reachable.
     sticky: Option<&'static identify::Entry>,
+    /// Fingers, on a device that has them.
+    touches: Touches,
+    /// Whether this is a phone or a tablet, decided once at startup.
+    ///
+    /// On one of those the viewer is a viewer and nothing else: no panel, no
+    /// key legend, no pinned names. All of it is text sized for a screen twenty
+    /// times the area, and reading is not what someone holding a phone came to
+    /// do. What is left is the plant, and the means to fly around it.
+    touch_only: bool,
     cursor: (f32, f32),
     viewport: (u32, u32),
     dirty: bool,
@@ -252,6 +309,7 @@ impl App {
         let (min, max) = classification.visible_bounds(&scene);
         let mut camera = Camera::default();
         camera.frame(Vec3::from(min), Vec3::from(max), 16.0 / 9.0);
+        let touch_only = is_touch_only();
         Self {
             scene: Rc::new(scene),
             classification,
@@ -265,9 +323,11 @@ impl App {
             selected: None,
             identifier: identify::Identifier::new().expect("identification table compiles"),
             hovered: None,
-            show_labels: true,
-            show_keys: true,
+            show_labels: !touch_only,
+            show_keys: !touch_only,
             sticky: None,
+            touches: Touches::new(),
+            touch_only,
             cursor: (0.0, 0.0),
             viewport: (1280, 720),
             dirty: true,
@@ -338,6 +398,53 @@ impl App {
             .and_then(|id| identify_instance(&self.scene, &self.identifier, id))
         {
             self.sticky = Some(entry);
+        }
+    }
+
+    /// Turn one finger's event into camera motion.
+    ///
+    /// Winit's web backend already separates touch from mouse — it branches on
+    /// the pointer type and a touch never arrives as `CursorMoved` or
+    /// `MouseInput` — so nothing here can affect a mouse, and a desktop machine
+    /// with a touchscreen simply gains a second way to fly.
+    ///
+    /// Look deltas are computed from successive positions rather than taken
+    /// from `DeviceEvent::MouseMotion`. Winit does fire that for touch as well,
+    /// but on WebKit its delta comes from `PointerEvent.movementX/Y`, which is
+    /// very likely always zero for a touch pointer. Positions are reported
+    /// either way, so subtracting them is the version that cannot be wrong.
+    fn on_touch(&mut self, finger: winit::event::Touch) {
+        let phase = match finger.phase {
+            TouchPhase::Started => touch::Phase::Started,
+            TouchPhase::Moved => touch::Phase::Moved,
+            // A cancel is the browser taking the gesture away — a system edge
+            // swipe, a phone call. It ends the finger exactly as a lift does,
+            // and treating it as anything else would leave it down forever.
+            TouchPhase::Ended | TouchPhase::Cancelled => touch::Phase::Ended,
+        };
+
+        // Winit reports physical pixels; the gesture thresholds are in CSS
+        // pixels so that they mean the same movement of the hand on a phone at
+        // ratio 3 as on a laptop at 1.
+        let ratio = web_sys::window().map_or(1.0, |w| w.device_pixel_ratio());
+        #[allow(clippy::cast_possible_truncation)]
+        let at = (
+            (finger.location.x / ratio) as f32,
+            (finger.location.y / ratio) as f32,
+        );
+
+        match self.touches.on_touch(finger.id, phase, at, Instant::now()) {
+            Some(touch::Action::Look { dx, dy }) => {
+                // `Camera::look` multiplies by a sensitivity, so hand it the
+                // radians already worked out and a factor of one.
+                self.camera
+                    .look(touch::look_radians(dx), touch::look_radians(dy), 1.0);
+            }
+            Some(touch::Action::Speed(ratio)) => {
+                self.camera.speed = (self.camera.speed * ratio).clamp(0.2, 400.0);
+            }
+            Some(touch::Action::Reframe) => self.frame_visible(),
+            None => {}
         }
     }
 
@@ -413,8 +520,14 @@ impl ApplicationHandler for App {
 
         match event {
             // Switching tab or clicking away sends the key-up somewhere else,
-            // and the camera would still be travelling on return.
-            WindowEvent::Focused(false) => self.input = Input::default(),
+            // and the camera would still be travelling on return. The same is
+            // true of a finger: the lift lands on whatever the user switched
+            // to, and this page never hears the gesture end.
+            WindowEvent::Focused(false) => {
+                self.input = Input::default();
+                self.touches.clear();
+            }
+            WindowEvent::Touch(finger) => self.on_touch(finger),
             WindowEvent::Resized(size) => {
                 self.viewport = (size.width.max(1), size.height.max(1));
                 if let Some(renderer) = self.renderer.borrow_mut().as_mut() {
@@ -540,15 +653,28 @@ impl App {
             return;
         };
         if self.panel.is_none() {
-            self.panel = Some(Panel::new(renderer.device(), window, renderer.format()));
+            let mut panel = Panel::new(renderer.device(), window, renderer.format());
+            // Built either way, because the same egui pass draws the labels and
+            // the renderer expects a callback. Hidden on a phone, where `H` and
+            // `K` are unreachable and there is nothing to read it with.
+            panel.visible = !self.touch_only;
+            self.panel = Some(panel);
         }
         let Some(panel) = self.panel.as_mut() else {
             return;
         };
 
-        let (forward, right, up) = self.input.axes();
-        self.camera
-            .fly(forward, right, up, dt, self.input.boost());
+        // Two fingers win over the keys while they are down. They cannot both
+        // be in use on the same device, and checking the touch state first
+        // means a stuck key cannot fight the joystick.
+        let (forward, right, up, boost) = match self.touches.fly() {
+            Some((forward, right, throttle)) => (forward, right, 0.0, throttle),
+            None => {
+                let (forward, right, up) = self.input.axes();
+                (forward, right, up, self.input.boost())
+            }
+        };
+        self.camera.fly(forward, right, up, dt, boost);
 
         if self.dirty {
             let picked = self.selected;

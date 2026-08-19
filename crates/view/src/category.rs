@@ -367,9 +367,6 @@ mod tests {
         assert_eq!(ids.len(), count, "duplicate category id");
     }
 
-    /// Order matters: the reactor vessel head must not be swallowed by a
-    /// broader pattern sitting above it.
-    #[test]
     /// Every glazing material in de_nuke, taken from the material paths in the
     /// bake. `structure` used to claim all of them, which is why none of it was
     /// visible: the glass went wherever the concrete went.
@@ -410,6 +407,8 @@ mod tests {
         assert_eq!(classify("materials/concrete/hr_concrete_wall_001b.vmat"), "structure");
     }
 
+    /// Order matters: the reactor vessel head must not be swallowed by a
+    /// broader pattern sitting above it.
     #[test]
     fn the_first_matching_category_wins_in_definition_order() {
         let compiled: Vec<Regex> = DEFS.iter().map(|d| Regex::new(d.pattern).unwrap()).collect();
